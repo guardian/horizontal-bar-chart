@@ -6,13 +6,32 @@ function init(results) {
 	var data = results.sheets.data
 	var details = results.sheets.details
 	var labels = results.sheets.labels
+	var userKey = results['sheets']['key']
 
 	function numberFormat(num) {
+        if ( num > 0 ) {
+            if ( num > 1000000000 ) { return ( num / 1000000000 ).toFixed(1) + 'bn' }
+            if ( num > 1000000 ) { return ( num / 1000000 ).toFixed(1) + 'm' }
+            if ( num > 1000 ) { return ( num / 1000 ).toFixed(1) + 'k' }
+            if (num % 1 != 0) { return num.toFixed(1) }
+            else { return num.toLocaleString() }
+        }
+        if ( num < 0 ) {
+            var posNum = num * -1;
+            if ( posNum > 1000000000 ) return [ "-" + String(( posNum / 1000000000 )) + 'bn'];
+            if ( posNum > 1000000 ) return ["-" + String(( posNum / 1000000 )) + 'm'];
+            if ( posNum > 1000 ) return ["-" + String(( posNum / 1000 )) + 'k'];
+            else { return num.toLocaleString() }
+        }
+        return num;
+    }
+
+    function axisFormat(num) {
         if ( num > 0 ) {
             if ( num > 1000000000 ) { return ( num / 1000000000 ) + 'bn' }
             if ( num > 1000000 ) { return ( num / 1000000 ) + 'm' }
             if ( num > 1000 ) { return ( num / 1000 ) + 'k' }
-            if (num % 1 != 0) { return num.toFixed(2) }
+            if (num % 1 != 0) { return num.toFixed(1) }
             else { return num.toLocaleString() }
         }
         if ( num < 0 ) {
@@ -37,7 +56,7 @@ function init(results) {
 	}
 
 	var width = document.querySelector("#graphicContainer").getBoundingClientRect().width
-	var height = width*0.5;					
+	var height = data.length * 70;				
 	var margin;
 
 	if (details[0]['margin-top']) {
@@ -59,7 +78,6 @@ function init(results) {
     var chartKey = d3.select("#chartKey");
 	chartKey.html("");
 
-
 	var svg = d3.select("#graphicContainer").append("svg")
 				.attr("width", width + margin.left + margin.right)
 				.attr("height", height + margin.top + margin.bottom)
@@ -71,26 +89,41 @@ function init(results) {
 	var keys = Object.keys(data[0])
 
 	var xVar;
+	var yVar;
 
-	if (details[0]['xColumn']) {
-		xVar = details[0]['xColumn'];
-		keys.splice(keys.indexOf(xVar), 1);
+	if (details[0]['yColumn']) {
+		yVar = details[0]['yColumn'];
+		// keys.splice(keys.indexOf(yVar), 1);
 	}
 	
 	else {
-		xVar = keys[0]
-		keys.splice(0, 1);
+		yVar = keys[0]
+		// keys.splice(0, 1);
+	}
+
+	if (details[0]['xColumn']) {
+		xVar = details[0]['xColumn'];
+		// keys.splice(keys.indexOf(xVar), 1);
 	}
 	
-	console.log(xVar, keys);
+	else {
+		xVar = keys[1]
+		// keys.splice(0, 1);
+	}
+	
+	// Check first entry and see if it looks like a string. True if string, false if number or number as string
+
+	var yNaN = isNaN(data[0][yVar])
+
+	console.log(yVar, keys);
 
 	data.forEach(function(d) {
-		if (typeof d[xVar] == 'string') {
-			d[xVar] = +d[xVar];
+		if (typeof d[yVar] == 'string' && !yNaN) {
+			d[yVar] = +d[yVar];
 		}
-		keys.forEach(function(key,i) { 
-			d[key] = +d[key]
-		});	
+		
+		d[xVar] = +d[xVar]
+
 	})
 
 	labels.forEach(function (d) {
@@ -99,33 +132,37 @@ function init(results) {
 		d.y2 = +d.y2
 	});
 
-	console.log(labels)
+	console.log(data)
 
-    var x = d3.scaleBand().range([0, width]).paddingInner(0.08);
-    var y = d3.scaleLinear().range([height, 0]);
+	userKey.forEach(function(key,i) { 
 
-    x.domain(data.map(function(d) { return d[xVar]; }));
-	y.domain(d3.extent(data, function(d) { return d[keys[0]]; })).nice();
+		var keyDiv = chartKey.append("div")
+						.attr("class","keyDiv")
+
+		keyDiv.append("span")
+			.attr("class", "keyCircle")
+			.style("background-color", function() {
+					return key.colour;
+				}
+			)
+
+		keyDiv.append("span")
+			.attr("class", "keyText")
+			.text(key.key)
+
+	})
+
+    var x = d3.scaleLinear().range([0,width]);
+    var y = d3.scaleBand().range([0,height]).paddingInner(0.3).paddingOuter(0.3);
+
+    y.domain(data.map(function(d) { return d[yVar]; }));
+	x.domain(d3.extent(data, function(d) { return d[xVar]; })).nice();
 
 	var xAxis;
 	var yAxis;
 
-
-	var ticks = x.domain().filter(function(d,i){ return !(i%10); } );
-
-	if (isMobile) {
-		ticks = x.domain().filter(function(d,i){ return !(i%20); } );
-	}	
-
-	if (isMobile) {
-		xAxis = d3.axisBottom(x).tickValues(ticks);
-		yAxis = d3.axisLeft(y).tickFormat(function (d) { return numberFormat(d)}).ticks(5);
-	}
-
-	else {
-		xAxis = d3.axisBottom(x).tickValues(ticks);
-		yAxis = d3.axisLeft(y).tickFormat(function (d) { return numberFormat(d)});
-	}
+	yAxis = d3.axisLeft(y);
+	xAxis = d3.axisBottom(x).tickFormat(function (d) { return axisFormat(d)});
 
 	features.append("g")
 			.attr("class","x")
@@ -140,20 +177,53 @@ function init(results) {
     	.data(data)
 		    .enter().append("rect")
 			.attr("class", "bar")
-			.attr("x", function(d) { return x(d[xVar]) })
+			.attr("x", 0)
 			.style("fill", function(d) {
-					return "rgb(204, 10, 17)"
+					return d.Color
 			})
 			.attr("y", function(d) { 
-				return y(Math.max(d[keys[0]], 0))
+				return y(d[yVar])
 				// return y(d[keys[0]]) 
 			})
-			.attr("width", x.bandwidth())
-			.attr("height", function(d) { 
-				return Math.abs(y(d[keys[0]]) - y(0))
+			.attr("width",  function(d) { return x(d[xVar]) })
+			.attr("height", y.bandwidth())
 
-			});
+	features.selectAll(".barText")
+    	.data(data)
+		    .enter().append("text")
+			.attr("class", "barText")
+			.attr("x", 5)
+			.attr("y", function(d) { 
+				return y(d[yVar]) - 5
+			})
+			.text(d => d[yVar])	
 
+	features.selectAll(".barNumber")
+    	.data(data)
+		    .enter().append("text")
+			.attr("class", "barNumber")
+			.attr("x", function(d) { 
+				if (x(d[xVar]) > 50) {
+					return x(d[xVar]) - 50 
+				}
+				else {
+					return x(d[xVar]) + 5 
+				}
+				
+			})
+			.style("fill", function(d) { 
+				if (x(d[xVar]) > 50) {
+					return "#FFF"
+				}
+				else {
+					return "#000"
+				}
+				
+			})
+			.attr("y", d => y(d[yVar]) + (y.bandwidth()/2 + 5))
+			.text(d => numberFormat(d[xVar]))			
+
+	d3.selectAll(".y .tick").remove();		
 
 	function textPadding(d) {
 		if (d.y2 > 0) {
@@ -261,6 +331,36 @@ function init(results) {
 
 	}		
 
+	// const fnmap = {
+	//   'toggle': 'toggle',
+	//     'show': 'add',
+	//     'hide': 'remove'
+	// };
+
+	// const collapse = (selector, cmd) => {
+	//   const targets = Array.from(document.querySelectorAll(selector));
+	//   console.log("targets",targets)
+	//   targets.forEach(target => {
+	//     target.classList[fnmap[cmd]]('show');
+	//   });
+	// }
+
+	// // Grab all the trigger elements on the page
+	// const triggers = Array.from(document.querySelectorAll('[data-toggle="collapse1"]'));
+	// // Listen for click events, but only on our triggers
+	// window.addEventListener('click', (ev) => {
+	// console.log("triggered")	
+	//   const elm = ev.target;
+	//   console.log(elm)
+	//   if (triggers.includes(elm)) {
+	//     const selector = elm.getAttribute('data-target');
+	//     console.log(selector)
+	//     collapse(selector, 'toggle');
+	//     elm.querySelectorAll('.is-on')[0].classList.toggle("hide");
+	//     elm.querySelectorAll('.is-off')[0].classList.toggle("hide");
+
+	//   }
+	// }, false);
 
 }	// end init
 
