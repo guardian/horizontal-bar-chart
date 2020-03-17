@@ -400,6 +400,22 @@ if ( key != null ) {
 			
 			})
 
+			var button = document.getElementById('button2');
+			var wrapper = document.getElementById('outer-wrapper');
+			var gradient = document.getElementById('gradientBar');
+
+			button.addEventListener("click", toggleButton);
+
+			function toggleButton() {
+				wrapper.classList.toggle('min');
+				gradient.classList.toggle('gradient');
+				button.querySelectorAll('.is-on')[0].classList.toggle("hide");
+				button.querySelectorAll('.is-off')[0].classList.toggle("hide");
+
+			}
+
 		});
+
+
 
 }
